@@ -5,96 +5,96 @@ import { DB } from './db.js';
    UTILITÁRIOS
 ===================================================== */
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
-const fmt = v => 'R$ ' + Number(v).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+const fmt = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const fmtDate = d => {
-  if(!d) return '';
-  const [y,m,dd] = d.split('-');
+  if (!d) return '';
+  const [y, m, dd] = d.split('-');
   return `${dd}/${m}/${y}`;
 };
 const fmtLong = d => {
-  if(!d) return '';
-  return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  if (!d) return '';
+  return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 };
 const dayMonth = d => {
-  if(!d) return {day:'',mon:''};
-  const [,m,dd] = d.split('-');
-  const M = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  return {day:dd, mon:M[+m-1]};
+  if (!d) return { day: '', mon: '' };
+  const [, m, dd] = d.split('-');
+  const M = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  return { day: dd, mon: M[+m - 1] };
 };
 const todayStr = () => {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 const svcIcon = name => {
-  const n = (name||'').toLowerCase();
-  if(n.includes('banho')) return '🛁';
-  if(n.includes('tosa')) return '✂️';
-  if(n.includes('consult')) return '🩺';
-  if(n.includes('vacin')) return '💉';
-  if(n.includes('exame')||n.includes('raio')) return '🩻';
+  const n = (name || '').toLowerCase();
+  if (n.includes('banho')) return '🛁';
+  if (n.includes('tosa')) return '✂️';
+  if (n.includes('consult')) return '🩺';
+  if (n.includes('vacin')) return '💉';
+  if (n.includes('exame') || n.includes('raio')) return '🩻';
   return '🐾';
 };
-const initials = name => (name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-const AV_COLORS = ['#C9A227','#3b82f6','#22c55e','#a855f7','#f59e0b','#06b6d4','#ef4444'];
+const initials = name => (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+const AV_COLORS = ['#C9A227', '#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#06b6d4', '#ef4444'];
 const avColor = name => {
   let h = 0;
-  for(let c of (name||'')) h = (h*31 + c.charCodeAt(0)) & 0xffffffff;
+  for (let c of (name || '')) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
   return AV_COLORS[Math.abs(h) % AV_COLORS.length];
 };
-const esc = (str) => String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const esc = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /* =====================================================
    TOAST
 ===================================================== */
 const T = {
-  show(msg, type='s'){
-    const icons = {s:'✓',e:'✕',w:'⚠',i:'ℹ'};
+  show(msg, type = 's') {
+    const icons = { s: '✓', e: '✕', w: '⚠', i: 'ℹ' };
     const w = document.getElementById('toastWrap');
-    if(!w) return;
+    if (!w) return;
     const el = document.createElement('div');
     el.className = `toast ${type}`;
-    el.innerHTML = `<span class="ticon">${icons[type]||'ℹ'}</span><span class="tmsg">${esc(msg)}</span>`;
+    el.innerHTML = `<span class="ticon">${icons[type] || 'ℹ'}</span><span class="tmsg">${esc(msg)}</span>`;
     w.appendChild(el);
-    setTimeout(()=>{
-      el.style.cssText='transition:.3s ease;opacity:0;transform:translateX(100%)';
-      setTimeout(()=>el.remove(),300);
-    },3200);
+    setTimeout(() => {
+      el.style.cssText = 'transition:.3s ease;opacity:0;transform:translateX(100%)';
+      setTimeout(() => el.remove(), 300);
+    }, 3200);
   },
-  ok(m){this.show(m,'s')}, err(m){this.show(m,'e')},
-  warn(m){this.show(m,'w')}, info(m){this.show(m,'i')}
+  ok(m) { this.show(m, 's') }, err(m) { this.show(m, 'e') },
+  warn(m) { this.show(m, 'w') }, info(m) { this.show(m, 'i') }
 };
 
 /* =====================================================
    DISPONIBILIDADE
 ===================================================== */
 const Avail = {
-  slots(proId, date){
-    const pro=DB.pros().find(p=>p.id===proId);
-    if(!pro) return [];
-    const dow=new Date(date+'T12:00:00').getDay();
-    if(!pro.workingDays.includes(dow)) return [];
-    const [sh,sm]=pro.workingHours.start.split(':').map(Number);
-    const [eh,em]=pro.workingHours.end.split(':').map(Number);
-    const s=sh*60+sm, e=eh*60+em, out=[];
-    for(let m=s;m<e;m+=30){
-      const h=Math.floor(m/60), mn=m%60;
-      out.push(`${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}`);
+  slots(proId, date) {
+    const pro = DB.pros().find(p => p.id === proId);
+    if (!pro) return [];
+    const dow = new Date(date + 'T12:00:00').getDay();
+    if (!pro.workingDays.includes(dow)) return [];
+    const [sh, sm] = pro.workingHours.start.split(':').map(Number);
+    const [eh, em] = pro.workingHours.end.split(':').map(Number);
+    const s = sh * 60 + sm, e = eh * 60 + em, out = [];
+    for (let m = s; m < e; m += 30) {
+      const h = Math.floor(m / 60), mn = m % 60;
+      out.push(`${String(h).padStart(2, '0')}:${String(mn).padStart(2, '0')}`);
     }
     return out;
   },
-  canBook(proId, date, time, dur, skipId=null){
-    const [h,m]=time.split(':').map(Number);
-    const s=h*60+m, n=Math.ceil(dur/30);
-    const need=new Set();
-    for(let i=0;i<n;i++){const t=s+i*30;need.add(`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`)}
-    const svcs=DB.services();
-    return !DB.apts().filter(a=>a.professionalId===proId&&a.date===date&&a.status!=='cancelado'&&a.id!==skipId).some(a=>{
-      const sv=svcs.find(s=>s.id===a.serviceId); if(!sv) return false;
-      const [ah,am]=a.time.split(':').map(Number);
-      const as2=ah*60+am, an=Math.ceil(sv.duration/30);
-      for(let i=0;i<an;i++){
-        const t=as2+i*30;
-        if(need.has(`${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`)) return true;
+  canBook(proId, date, time, dur, skipId = null) {
+    const [h, m] = time.split(':').map(Number);
+    const s = h * 60 + m, n = Math.ceil(dur / 30);
+    const need = new Set();
+    for (let i = 0; i < n; i++) { const t = s + i * 30; need.add(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`) }
+    const svcs = DB.services();
+    return !DB.apts().filter(a => a.professionalId === proId && a.date === date && a.status !== 'cancelado' && a.id !== skipId).some(a => {
+      const sv = svcs.find(s => s.id === a.serviceId); if (!sv) return false;
+      const [ah, am] = a.time.split(':').map(Number);
+      const as2 = ah * 60 + am, an = Math.ceil(sv.duration / 30);
+      for (let i = 0; i < an; i++) {
+        const t = as2 + i * 30;
+        if (need.has(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`)) return true;
       }
       return false;
     });
@@ -105,11 +105,11 @@ const Avail = {
    BOOKING STATE
 ===================================================== */
 const BS = {
-  step:1, service:null, pro:null, date:null, time:null,
-  calM:new Date().getMonth(), calY:new Date().getFullYear(),
-  reset(){
-    this.step=1;this.service=null;this.pro=null;this.date=null;this.time=null;
-    const d=new Date();this.calM=d.getMonth();this.calY=d.getFullYear();
+  step: 1, service: null, pro: null, date: null, time: null,
+  calM: new Date().getMonth(), calY: new Date().getFullYear(),
+  reset() {
+    this.step = 1; this.service = null; this.pro = null; this.date = null; this.time = null;
+    const d = new Date(); this.calM = d.getMonth(); this.calY = d.getFullYear();
   }
 };
 
@@ -117,7 +117,7 @@ const BS = {
    ROUTER / NAV
 ===================================================== */
 const Nav = {
-  go(page){
+  go(page) {
     let base = window.location.href.split('#')[0];
     window.location.href = base + '#' + page;
     App.render();
@@ -132,30 +132,30 @@ let _tenantUsers = [];
    RENDER COMPONENTS
 ===================================================== */
 const rNavbar = () => {
-  if(!Auth.ok()) return '';
-  const hash=window.location.hash.slice(1).split('?')[0];
-  const isAdm=Auth.isAdmin();
-  const isSuper=Auth.isSuperAdmin();
-  
+  if (!Auth.ok()) return '';
+  const hash = window.location.hash.slice(1).split('?')[0];
+  const isAdm = Auth.isAdmin();
+  const isSuper = Auth.isSuperAdmin();
+
   let links = [];
-  if(isSuper) links = [{h:'superadmin',l:'Super Admin',i:'👑'}];
-  else if(isAdm) links = [{h:'admin',l:'Dashboard',i:'◈'},{h:'admin-services',l:'Serviços',i:'✦'},{h:'admin-barbers',l:'Especialistas',i:'🐾'},{h:'admin-appointments',l:'Agendamentos',i:'📅'}];
-  else links = [{h:'home',l:'Início',i:'⌂'},{h:'booking',l:'Agendar',i:'＋'},{h:'appointments',l:'Meus Agendamentos',i:'📅'}];
-  
-  const u=Auth.cur;
-  const ac=avColor(u.name);
-  const tc=ac==='#C9A227'?'#000':'#fff';
+  if (isSuper) links = [{ h: 'superadmin', l: 'Super Admin', i: '👑' }];
+  else if (isAdm) links = [{ h: 'admin', l: 'Dashboard', i: '◈' }, { h: 'admin-services', l: 'Serviços', i: '✦' }, { h: 'admin-barbers', l: 'Especialistas', i: '🐾' }, { h: 'admin-appointments', l: 'Agendamentos', i: '📅' }];
+  else links = [{ h: 'home', l: 'Início', i: '⌂' }, { h: 'booking', l: 'Agendar', i: '＋' }, { h: 'appointments', l: 'Meus Agendamentos', i: '📅' }];
+
+  const u = Auth.cur;
+  const ac = avColor(u.name);
+  const tc = ac === '#C9A227' ? '#000' : '#fff';
   const logoText = _tenantInfo ? _tenantInfo.name : 'Hora Pet';
 
   return `
 <nav class="navbar">
   <div class="nb-inner">
-    <div class="nb-logo" onclick="Nav.go('${isSuper?'superadmin':isAdm?'admin':'home'}')">
+    <div class="nb-logo" onclick="Nav.go('${isSuper ? 'superadmin' : isAdm ? 'admin' : 'home'}')">
       <div class="nb-logo-icon">🐾</div>
       <span>${esc(logoText)}</span>
     </div>
     <ul class="nb-nav">
-      ${links.map(l=>`<li><a href="#${l.h}" class="${hash===l.h?'active':''}">${l.i} ${l.l}</a></li>`).join('')}
+      ${links.map(l => `<li><a href="#${l.h}" class="${hash === l.h ? 'active' : ''}">${l.i} ${l.l}</a></li>`).join('')}
     </ul>
     <div class="nb-right">
       <div class="user-pill" onclick="App.toggleUserDD()" id="uPill">
@@ -170,14 +170,14 @@ const rNavbar = () => {
   </div>
 </nav>
 <div class="mob-menu" id="mobMenu">
-  ${links.map(l=>`<a href="#${l.h}" class="${hash===l.h?'active':''}" onclick="App.closeMob()">${l.i} ${l.l}</a>`).join('')}
+  ${links.map(l => `<a href="#${l.h}" class="${hash === l.h ? 'active' : ''}" onclick="App.closeMob()">${l.i} ${l.l}</a>`).join('')}
   <div style="height:1px;background:var(--border);margin:8px 0"></div>
   <div style="padding:10px 14px;display:flex;align-items:center;gap:11px">
     <div class="uavatar" style="background:${ac};color:${tc};width:38px;height:38px;font-size:.9rem">${initials(u.name)}</div>
     <div>
       <div style="font-weight:600;font-size:.9rem">${esc(u.name)}</div>
       <div style="font-size:.78rem;color:var(--text2)">${esc(u.email)}</div>
-      ${u.points>0?`<div style="font-size:.72rem;color:var(--gold);margin-top:2px">⭐ ${u.points} pontos</div>`:''}
+      ${u.points > 0 ? `<div style="font-size:.72rem;color:var(--gold);margin-top:2px">⭐ ${u.points} pontos</div>` : ''}
     </div>
   </div>
   <button class="btn btn-ghost w-full" onclick="App.logout()" style="margin-top:6px">⏻ Sair da conta</button>
@@ -261,9 +261,9 @@ const rNoTenant = () => `
 </div>`;
 
 const rHome = () => {
-  const svcs=DB.services(), pros=DB.pros(), u=Auth.cur;
-  const upApts=DB.apts().filter(a=>a.userId===u.id&&a.status==='confirmado'&&a.date>=todayStr()).sort((a,b)=>a.date.localeCompare(b.date));
-  const next=upApts[0];
+  const svcs = DB.services(), pros = DB.pros(), u = Auth.cur;
+  const upApts = DB.apts().filter(a => a.userId === u.id && a.status === 'confirmado' && a.date >= todayStr()).sort((a, b) => a.date.localeCompare(b.date));
+  const next = upApts[0];
   return `
 <div class="page">
   <div class="container">
@@ -276,19 +276,19 @@ const rHome = () => {
         <button class="btn btn-ghost btn-lg" onclick="Nav.go('appointments')">📅 Meus Agendamentos</button>
       </div>
       ${next ? (() => {
-        const sv=svcs.find(s=>s.id===next.serviceId); const pr=pros.find(p=>p.id===next.professionalId);
-        return `<div style="max-width:400px;margin:28px auto 0;background:var(--ga1);border:1px solid var(--gold3);border-radius:var(--r);padding:14px 18px;text-align:left">
+      const sv = svcs.find(s => s.id === next.serviceId); const pr = pros.find(p => p.id === next.professionalId);
+      return `<div style="max-width:400px;margin:28px auto 0;background:var(--ga1);border:1px solid var(--gold3);border-radius:var(--r);padding:14px 18px;text-align:left">
           <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:1px;color:var(--gold);font-weight:700;margin-bottom:6px">📅 Próximo Agendamento</div>
-          <div style="font-weight:700;font-size:.97rem;font-family:var(--ft)">${esc(sv?.name||'')}</div>
-          <div style="font-size:.82rem;color:var(--text2);margin-top:3px">com ${esc(pr?.name||'')} · ${fmtDate(next.date)} às ${next.time}</div>
+          <div style="font-weight:700;font-size:.97rem;font-family:var(--ft)">${esc(sv?.name || '')}</div>
+          <div style="font-size:.82rem;color:var(--text2);margin-top:3px">com ${esc(pr?.name || '')} · ${fmtDate(next.date)} às ${next.time}</div>
         </div>`;
-      })() : ''}
+    })() : ''}
     </section>
     <div class="gold-line"></div>
     <section>
       <div class="sec-head"><span class="slabel">✦ O que oferecemos</span><h2>Nossos Serviços</h2></div>
       <div class="grid g3">
-        ${svcs.map(s=>`
+        ${svcs.map(s => `
         <div class="svc-card" onclick="App.bookWith('${s.id}')">
           <div class="svc-icon">${svcIcon(s.name)}</div>
           <div class="svc-name">${esc(s.name)}</div>
@@ -300,14 +300,14 @@ const rHome = () => {
     <section style="margin-bottom:60px">
       <div class="sec-head"><span class="slabel">✦ Nossa equipe</span><h2>Nossos Especialistas</h2></div>
       <div class="grid g3">
-        ${pros.map(p=>{
-          const ac=avColor(p.name), tc=ac==='#C9A227'?'#000':'#fff';
-          return `<div class="brb-card card-hover" onclick="Nav.go('booking')">
+        ${pros.map(p => {
+      const ac = avColor(p.name), tc = ac === '#C9A227' ? '#000' : '#fff';
+      return `<div class="brb-card card-hover" onclick="Nav.go('booking')">
             <div class="brb-av" style="background:${ac};color:${tc}">${initials(p.name)}</div>
             <div class="brb-name">${esc(p.name)}</div>
-            <div class="tags">${(p.specialties||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+            <div class="tags">${(p.specialties || []).map(s => `<span class="tag">${esc(s)}</span>`).join('')}</div>
           </div>`;
-        }).join('')}
+    }).join('')}
       </div>
     </section>
   </div>
@@ -316,17 +316,17 @@ const rHome = () => {
 
 // --- BOOKING ---
 const rBooking = () => {
-  const {step} = BS;
-  const stepDefs = ['Serviço','Especialista','Data & Hora','Confirmar'];
-  const stepsH = stepDefs.map((lbl,i)=>{
-    const n=i+1, act=n===step, done=n<step;
-    const cc=done?'done':act?'active':'';
-    return `${i>0?`<div class="step-line ${n-1<step?'done':''}"></div>`:''}<div class="wiz-step"><div class="step-c ${cc}">${done?'✓':n}</div><span class="step-lbl ${cc}">${lbl}</span></div>`;
+  const { step } = BS;
+  const stepDefs = ['Serviço', 'Especialista', 'Data & Hora', 'Confirmar'];
+  const stepsH = stepDefs.map((lbl, i) => {
+    const n = i + 1, act = n === step, done = n < step;
+    const cc = done ? 'done' : act ? 'active' : '';
+    return `${i > 0 ? `<div class="step-line ${n - 1 < step ? 'done' : ''}"></div>` : ''}<div class="wiz-step"><div class="step-c ${cc}">${done ? '✓' : n}</div><span class="step-lbl ${cc}">${lbl}</span></div>`;
   }).join('');
 
-  if(step===5) return `<div class="page"><div class="container">${rBkSuccess()}</div></div>`;
+  if (step === 5) return `<div class="page"><div class="container">${rBkSuccess()}</div></div>`;
 
-  const content = step===1?rBkS1():step===2?rBkS2():step===3?rBkS3():rBkS4();
+  const content = step === 1 ? rBkS1() : step === 2 ? rBkS2() : step === 3 ? rBkS3() : rBkS4();
   return `
 <div class="page">
   <div class="container">
@@ -338,72 +338,72 @@ const rBooking = () => {
 };
 
 const rBkS1 = () => {
-  const svcs=DB.services();
+  const svcs = DB.services();
   return `
   <h3 style="font-family:var(--ft);font-size:1.15rem;margin-bottom:18px">1. Escolha um serviço</h3>
   <div class="grid g2" style="margin-bottom:22px">
-    ${svcs.map(s=>`
-    <div class="svc-card ${BS.service?.id===s.id?'sel':''}" onclick="App.selSvc('${s.id}')">
+    ${svcs.map(s => `
+    <div class="svc-card ${BS.service?.id === s.id ? 'sel' : ''}" onclick="App.selSvc('${s.id}')">
       <div class="svc-icon">${svcIcon(s.name)}</div>
       <div class="svc-name">${esc(s.name)}</div>
       <div class="svc-meta"><span class="svc-price">${fmt(s.price)}</span><span class="svc-dur">⏱ ${s.duration} min</span></div>
     </div>`).join('')}
   </div>
   <div style="display:flex;justify-content:flex-end">
-    <button class="btn btn-primary" onclick="App.bkNext()" ${!BS.service?'disabled':''}>Próximo: Barbeiro →</button>
+    <button class="btn btn-primary" onclick="App.bkNext()" ${!BS.service ? 'disabled' : ''}>Próximo: Profissional →</button>
   </div>`;
 };
 
 const rBkS2 = () => {
-  const pros=DB.pros();
+  const pros = DB.pros();
   return `
   <div style="display:flex;align-items:center;gap:11px;margin-bottom:18px"><button class="btn btn-ghost btn-sm" onclick="App.bkBack()">← Voltar</button><h3 style="font-family:var(--ft);font-size:1.15rem">2. Escolha o barbeiro</h3></div>
   <div class="grid g3" style="margin-bottom:22px">
-    ${pros.map(p=>{
-      const ac=avColor(p.name), tc=ac==='#C9A227'?'#000':'#fff';
-      return `<div class="brb-card ${BS.pro?.id===p.id?'sel':''}" onclick="App.selPro('${p.id}')">
+    ${pros.map(p => {
+    const ac = avColor(p.name), tc = ac === '#C9A227' ? '#000' : '#fff';
+    return `<div class="brb-card ${BS.pro?.id === p.id ? 'sel' : ''}" onclick="App.selPro('${p.id}')">
         <div class="brb-av" style="background:${ac};color:${tc}">${initials(p.name)}</div>
         <div class="brb-name">${esc(p.name)}</div>
         <div style="font-size:.72rem;color:var(--text2);margin-top:10px">🕐 ${p.workingHours.start} – ${p.workingHours.end}</div>
       </div>`;
-    }).join('')}
+  }).join('')}
   </div>
   <div style="display:flex;justify-content:flex-end">
-    <button class="btn btn-primary" onclick="App.bkNext()" ${!BS.pro?'disabled':''}>Próximo: Data →</button>
+    <button class="btn btn-primary" onclick="App.bkNext()" ${!BS.pro ? 'disabled' : ''}>Próximo: Data →</button>
   </div>`;
 };
 
 const rBkS3 = () => {
-  const {calM,calY,date:sd,time:st,pro,service}=BS;
-  const mNames=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  const first=new Date(calY,calM,1).getDay();
-  const days=new Date(calY,calM+1,0).getDate();
-  const today=new Date(); today.setHours(0,0,0,0);
-  const dows=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const { calM, calY, date: sd, time: st, pro, service } = BS;
+  const mNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const first = new Date(calY, calM, 1).getDay();
+  const days = new Date(calY, calM + 1, 0).getDate();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dows = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-  let calH=`<div class="cal-wrap"><div class="cal-head"><button class="cal-nav" onclick="App.calP()">‹</button><div class="cal-month">${mNames[calM]} ${calY}</div><button class="cal-nav" onclick="App.calN()">›</button></div><div class="cal-grid">${dows.map(d=>`<div class="cal-dow">${d}</div>`).join('')}`;
-  for(let i=0;i<first;i++) calH+=`<div class="cal-day om"></div>`;
-  for(let d=1;d<=days;d++){
-    const dObj=new Date(calY,calM,d); dObj.setHours(0,0,0,0);
-    const ds=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dis=dObj<today||(pro&&!pro.workingDays.includes(dObj.getDay()));
-    let cls='cal-day'+(dis?' dis':ds===sd?' picked':dObj.getTime()===today.getTime()?' today':'');
-    calH+=`<div class="${cls}" ${!dis?`onclick="App.selDate('${ds}')"`:''}>${d}</div>`;
+  let calH = `<div class="cal-wrap"><div class="cal-head"><button class="cal-nav" onclick="App.calP()">‹</button><div class="cal-month">${mNames[calM]} ${calY}</div><button class="cal-nav" onclick="App.calN()">›</button></div><div class="cal-grid">${dows.map(d => `<div class="cal-dow">${d}</div>`).join('')}`;
+  for (let i = 0; i < first; i++) calH += `<div class="cal-day om"></div>`;
+  for (let d = 1; d <= days; d++) {
+    const dObj = new Date(calY, calM, d); dObj.setHours(0, 0, 0, 0);
+    const ds = `${calY}-${String(calM + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const dis = dObj < today || (pro && !pro.workingDays.includes(dObj.getDay()));
+    let cls = 'cal-day' + (dis ? ' dis' : ds === sd ? ' picked' : dObj.getTime() === today.getTime() ? ' today' : '');
+    calH += `<div class="${cls}" ${!dis ? `onclick="App.selDate('${ds}')"` : ''}>${d}</div>`;
   }
-  calH+=`</div></div>`;
+  calH += `</div></div>`;
 
-  let timesH='';
-  if(sd&&pro&&service){
-    const allSlots=Avail.slots(pro.id,sd);
-    if(allSlots.length===0){ timesH=`<div style="text-align:center;padding:24px;color:var(--text2)">Especialista não atende neste dia.</div>`; } 
+  let timesH = '';
+  if (sd && pro && service) {
+    const allSlots = Avail.slots(pro.id, sd);
+    if (allSlots.length === 0) { timesH = `<div style="text-align:center;padding:24px;color:var(--text2)">Especialista não atende neste dia.</div>`; }
     else {
-      timesH=`<h4 style="font-size:.8rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Horários — ${fmtDate(sd)}</h4>
+      timesH = `<h4 style="font-size:.8rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Horários — ${fmtDate(sd)}</h4>
       <div class="slots-grid">
-        ${allSlots.map(slot=>{
-          const avail=Avail.canBook(pro.id,sd,slot,service.duration);
-          let cls='slot'+(!avail?' booked':slot===st?' picked':'');
-          return `<div class="${cls}" ${avail?`onclick="App.selTime('${slot}')"`:''}>${slot}</div>`;
-        }).join('')}
+        ${allSlots.map(slot => {
+        const avail = Avail.canBook(pro.id, sd, slot, service.duration);
+        let cls = 'slot' + (!avail ? ' booked' : slot === st ? ' picked' : '');
+        return `<div class="${cls}" ${avail ? `onclick="App.selTime('${slot}')"` : ''}>${slot}</div>`;
+      }).join('')}
       </div>`;
     }
   }
@@ -412,15 +412,15 @@ const rBkS3 = () => {
   <div style="display:flex;align-items:center;gap:11px;margin-bottom:18px"><button class="btn btn-ghost btn-sm" onclick="App.bkBack()">← Voltar</button><h3 style="font-family:var(--ft);font-size:1.15rem">3. Escolha data e horário</h3></div>
   <div class="booking-date-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:22px">
     <div>${calH}</div>
-    <div style="min-height:200px">${timesH||`<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text2);font-size:.87rem">Selecione uma data</div>`}</div>
+    <div style="min-height:200px">${timesH || `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text2);font-size:.87rem">Selecione uma data</div>`}</div>
   </div>
   <div style="display:flex;justify-content:flex-end">
-    <button class="btn btn-primary" onclick="App.bkNext()" ${!sd||!st?'disabled':''}>Próximo: Confirmar →</button>
+    <button class="btn btn-primary" onclick="App.bkNext()" ${!sd || !st ? 'disabled' : ''}>Próximo: Confirmar →</button>
   </div>`;
 };
 
 const rBkS4 = () => {
-  const {service,pro,date,time}=BS; const u=Auth.cur;
+  const { service, pro, date, time } = BS; const u = Auth.cur;
   return `
   <div style="display:flex;align-items:center;gap:11px;margin-bottom:18px"><button class="btn btn-ghost btn-sm" onclick="App.bkBack()">← Voltar</button><h3 style="font-family:var(--ft);font-size:1.15rem">4. Confirme seu agendamento</h3></div>
   <div class="conf-sum">
@@ -447,31 +447,31 @@ const rBkSuccess = () => `
 
 // --- APPOINTMENTS ---
 const rAppointments = () => {
-  const u=Auth.cur, td=todayStr();
-  const svcs=DB.services(), pros=DB.pros();
-  const all=DB.apts();
-  const upcoming=all.filter(a=>a.date>=td&&a.status!=='cancelado').sort((a,b)=>a.date.localeCompare(b.date));
-  const past=all.filter(a=>a.date<td||a.status==='cancelado').sort((a,b)=>b.date.localeCompare(a.date));
+  const u = Auth.cur, td = todayStr();
+  const svcs = DB.services(), pros = DB.pros();
+  const all = DB.apts();
+  const upcoming = all.filter(a => a.date >= td && a.status !== 'cancelado').sort((a, b) => a.date.localeCompare(b.date));
+  const past = all.filter(a => a.date < td || a.status === 'cancelado').sort((a, b) => b.date.localeCompare(a.date));
 
   const rCard = (apt, showAct) => {
-    const sv=svcs.find(s=>s.id===apt.serviceId), pr=pros.find(p=>p.id===apt.professionalId);
-    const dm=dayMonth(apt.date);
-    const [bc,bl]=apt.status==='confirmado'?['b-success','Confirmado']:apt.status==='cancelado'?['b-danger','Cancelado']:['b-info','Concluído'];
-    const isUp=apt.date>=td&&apt.status!=='cancelado';
+    const sv = svcs.find(s => s.id === apt.serviceId), pr = pros.find(p => p.id === apt.professionalId);
+    const dm = dayMonth(apt.date);
+    const [bc, bl] = apt.status === 'confirmado' ? ['b-success', 'Confirmado'] : apt.status === 'cancelado' ? ['b-danger', 'Cancelado'] : ['b-info', 'Concluído'];
+    const isUp = apt.date >= td && apt.status !== 'cancelado';
     return `
     <div class="apt-card">
       <div class="apt-dbox"><div class="apt-day">${dm.day}</div><div class="apt-mon">${dm.mon}</div></div>
       <div style="flex:1;min-width:0">
-        <div class="apt-svc">${esc(sv?.name||'Serviço excluído')}</div>
-        <div class="apt-det">🐾 ${esc(pr?.name||'—')} · 🕐 ${apt.time}</div>
+        <div class="apt-svc">${esc(sv?.name || 'Serviço excluído')}</div>
+        <div class="apt-det">🐾 ${esc(pr?.name || '—')} · 🕐 ${apt.time}</div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span class="badge ${bc}">${bl}</span>
           <span class="tgold" style="font-weight:700;font-size:.87rem">${fmt(apt.price)}</span>
         </div>
-        ${showAct&&isUp?`
+        ${showAct && isUp ? `
         <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">
           <button class="btn btn-danger btn-sm" onclick="App.cancelApt('${apt.id}')">✕ Cancelar</button>
-        </div>`:''}
+        </div>`: ''}
       </div>
     </div>`;
   };
@@ -483,10 +483,10 @@ const rAppointments = () => {
       <div class="tab" id="tH" onclick="App.tabApt('h')">Histórico (${past.length})</div>
     </div>
     <div id="tcU" style="display:flex;flex-direction:column;gap:11px">
-      ${upcoming.length===0?`<div class="empty"><div class="empty-ico">📅</div><div class="empty-t">Nenhum agendamento</div></div>`:upcoming.map(a=>rCard(a,true)).join('')}
+      ${upcoming.length === 0 ? `<div class="empty"><div class="empty-ico">📅</div><div class="empty-t">Nenhum agendamento</div></div>` : upcoming.map(a => rCard(a, true)).join('')}
     </div>
     <div id="tcH" style="display:none;flex-direction:column;gap:11px">
-      ${past.map(a=>rCard(a,false)).join('')}
+      ${past.map(a => rCard(a, false)).join('')}
     </div>
   </div></div>`;
 };
@@ -495,33 +495,33 @@ const rAppointments = () => {
    ADMIN SCREENS
 ===================================================== */
 const rAdmLayout = (active, content) => {
-  const items=[
-    {id:'admin',i:'◈',l:'Dashboard'},
-    {id:'admin-services',i:'✦',l:'Serviços'},
-    {id:'admin-barbers',i:'🐾',l:'Especialistas'},
-    {id:'admin-appointments',i:'📅',l:'Agendamentos'},
+  const items = [
+    { id: 'admin', i: '◈', l: 'Dashboard' },
+    { id: 'admin-services', i: '✦', l: 'Serviços' },
+    { id: 'admin-barbers', i: '🐾', l: 'Especialistas' },
+    { id: 'admin-appointments', i: '📅', l: 'Agendamentos' },
   ];
   return `
 <div class="adm-layout">
   <div class="adm-mob-nav">
-    ${items.map(it=>`<button class="btn ${active===it.id?'btn-outline':'btn-ghost'} btn-sm" onclick="Nav.go('${it.id}')">${it.i}</button>`).join('')}
+    ${items.map(it => `<button class="btn ${active === it.id ? 'btn-outline' : 'btn-ghost'} btn-sm" onclick="Nav.go('${it.id}')">${it.i}</button>`).join('')}
   </div>
   <aside class="adm-sidebar">
     <div class="adm-st">Painel Clínica</div>
-    ${items.map(it=>`<a href="#${it.id}" class="adm-nav-item ${active===it.id?'active':''}" onclick="Nav.go('${it.id}'); return false;">${it.i} <span>${it.l}</span></a>`).join('')}
+    ${items.map(it => `<a href="#${it.id}" class="adm-nav-item ${active === it.id ? 'active' : ''}" onclick="Nav.go('${it.id}'); return false;">${it.i} <span>${it.l}</span></a>`).join('')}
   </aside>
   <main class="adm-content">${content}</main>
 </div>`;
 };
 
 const rAdmDash = () => {
-  const all=DB.apts(), pros=DB.pros(), svcs=DB.services();
-  const td=todayStr();
-  const rev=all.filter(a=>a.status!=='cancelado').reduce((s,a)=>s+Number(a.price||0),0);
-  const conf=all.filter(a=>a.status==='confirmado'&&a.date>=td);
-  
-  return rAdmLayout('admin',`
-  <div class="ph"><div><h1 class="ptitle">Dashboard</h1><p class="psub">${_tenantInfo?.name||''}</p></div></div>
+  const all = DB.apts(), pros = DB.pros(), svcs = DB.services();
+  const td = todayStr();
+  const rev = all.filter(a => a.status !== 'cancelado').reduce((s, a) => s + Number(a.price || 0), 0);
+  const conf = all.filter(a => a.status === 'confirmado' && a.date >= td);
+
+  return rAdmLayout('admin', `
+  <div class="ph"><div><h1 class="ptitle">Dashboard</h1><p class="psub">${_tenantInfo?.name || ''}</p></div></div>
   <div class="stats-grid">
     <div class="stat-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span class="tsm tmuted" style="font-weight:700">Total Agendamentos</span></div><div class="scv">${all.length}</div></div>
     <div class="stat-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span class="tsm tmuted" style="font-weight:700">Receita Total</span></div><div class="scv" style="color:var(--success)">${fmt(rev)}</div></div>
@@ -530,14 +530,14 @@ const rAdmDash = () => {
 };
 
 const rAdmServices = () => {
-  const svcs=DB.services();
-  return rAdmLayout('admin-services',`
+  const svcs = DB.services();
+  return rAdmLayout('admin-services', `
   <div class="ph">
     <div><h1 class="ptitle">Gerenciar Serviços</h1></div>
     <button class="btn btn-primary" onclick="App.openSvcModal()">＋ Novo Serviço</button>
   </div>
   <div class="grid g2">
-    ${svcs.map(s=>`
+    ${svcs.map(s => `
     <div class="card card-hover">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:11px">
         <div style="display:flex;align-items:center;gap:10px">
@@ -557,16 +557,16 @@ const rAdmServices = () => {
 };
 
 const rAdmBarbers = () => {
-  const pros=DB.pros();
-  return rAdmLayout('admin-barbers',`
+  const pros = DB.pros();
+  return rAdmLayout('admin-barbers', `
   <div class="ph">
     <div><h1 class="ptitle">Gerenciar Especialistas</h1></div>
     <button class="btn btn-primary" onclick="App.openBrbModal()">＋ Novo Especialista</button>
   </div>
   <div class="grid g2">
-    ${pros.map(p=>{
-      const ac=avColor(p.name), tc=ac==='#C9A227'?'#000':'#fff';
-      return `
+    ${pros.map(p => {
+    const ac = avColor(p.name), tc = ac === '#C9A227' ? '#000' : '#fff';
+    return `
       <div class="card card-hover">
         <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px">
           <div class="brb-av" style="background:${ac};color:${tc};flex-shrink:0">${initials(p.name)}</div>
@@ -584,13 +584,13 @@ const rAdmBarbers = () => {
           </div>
         </div>
       </div>`;
-    }).join('')}
+  }).join('')}
   </div>`);
 };
 
 const rAdmApts = () => {
-  const all=[...DB.apts()].sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time));
-  return rAdmLayout('admin-appointments',`
+  const all = [...DB.apts()].sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
+  return rAdmLayout('admin-appointments', `
   <div class="ph"><div><h1 class="ptitle">Agendamentos</h1></div></div>
   <div class="tbl-wrap">
     <table><thead><tr><th>Cliente</th><th>Serviço</th><th>Especialista</th><th>Data</th><th>Hora</th><th>Status</th><th>Ações</th></tr></thead>
@@ -599,18 +599,18 @@ const rAdmApts = () => {
 };
 
 const rAptRows = (apts) => {
-  if(!apts.length) return `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--text2)">Nenhum agendamento encontrado.</td></tr>`;
-  const svcs=DB.services(), pros=DB.pros();
-  return apts.map(apt=>{
-    const sv=svcs.find(s=>s.id===apt.serviceId), pr=pros.find(p=>p.id===apt.professionalId), usr=_tenantUsers.find(u=>u.id===apt.userId);
-    const [bc,bl]=apt.status==='confirmado'?['b-success','Confirmado']:apt.status==='cancelado'?['b-danger','Cancelado']:['b-info','Concluído'];
+  if (!apts.length) return `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--text2)">Nenhum agendamento encontrado.</td></tr>`;
+  const svcs = DB.services(), pros = DB.pros();
+  return apts.map(apt => {
+    const sv = svcs.find(s => s.id === apt.serviceId), pr = pros.find(p => p.id === apt.professionalId), usr = _tenantUsers.find(u => u.id === apt.userId);
+    const [bc, bl] = apt.status === 'confirmado' ? ['b-success', 'Confirmado'] : apt.status === 'cancelado' ? ['b-danger', 'Cancelado'] : ['b-info', 'Concluído'];
     return `<tr>
-      <td>${esc(usr?.name||'—')}</td><td>${esc(sv?.name||'—')}</td><td>${esc(pr?.name||'—')}</td>
+      <td>${esc(usr?.name || '—')}</td><td>${esc(sv?.name || '—')}</td><td>${esc(pr?.name || '—')}</td>
       <td>${fmtDate(apt.date)}</td><td>${apt.time}</td>
       <td><span class="badge ${bc}">${bl}</span></td>
       <td><div style="display:flex;gap:5px">
-        ${apt.status!=='cancelado'?`<button class="btn btn-danger btn-sm" onclick="App.admCancel('${apt.id}')">Cancelar</button>`:''}
-        ${apt.status==='confirmado'?`<button class="btn btn-success btn-sm" onclick="App.admComplete('${apt.id}')">Concluir</button>`:''}
+        ${apt.status !== 'cancelado' ? `<button class="btn btn-danger btn-sm" onclick="App.admCancel('${apt.id}')">Cancelar</button>` : ''}
+        ${apt.status === 'confirmado' ? `<button class="btn btn-success btn-sm" onclick="App.admComplete('${apt.id}')">Concluir</button>` : ''}
       </div></td>
     </tr>`;
   }).join('');
@@ -652,22 +652,22 @@ const openTenantModal = () => {
       </form>
     </div>
   </div>`;
-  
+
   document.getElementById('tntFrm').onsubmit = async e => {
     e.preventDefault();
-    const fd=new FormData(e.target);
-    const slug=fd.get('slug'), name=fd.get('name'), email=fd.get('demail'), pw=fd.get('dpw');
-    try{
-      document.getElementById('btnCTnt').disabled=true;
+    const fd = new FormData(e.target);
+    const slug = fd.get('slug'), name = fd.get('name'), email = fd.get('demail'), pw = fd.get('dpw');
+    try {
+      document.getElementById('btnCTnt').disabled = true;
       const ex = await DB.getBarbeariaBySlug(slug);
-      if(ex) throw new Error('Este slug já está em uso.');
+      if (ex) throw new Error('Este slug já está em uso.');
 
       T.warn('Você será logado como o novo Admin.');
-      await Auth.register({name: 'Dono ' + name, email, pw, role: 'admin', barbeariaId: slug});
+      await Auth.register({ name: 'Dono ' + name, email, pw, role: 'admin', barbeariaId: slug });
       await DB.createBarbearia(slug, name, Auth.cur.id);
-      
+
       App.closeModal(); T.ok('Tenant criado com sucesso!'); window.location.href = `?b=${slug}#admin`;
-    }catch(err){ document.getElementById('btnCTnt').disabled=false; T.err(err.message); }
+    } catch (err) { document.getElementById('btnCTnt').disabled = false; T.err(err.message); }
   };
 };
 
@@ -675,86 +675,86 @@ const openTenantModal = () => {
    APP CONTROLLER PRINCIPAL
 ===================================================== */
 export const App = {
-  async render(){
-    const hash=window.location.hash.slice(1).split('?')[0]||'home';
-    const app=document.getElementById('app');
-    const dd=document.getElementById('userDD');if(dd)dd.remove();
+  async render() {
+    const hash = window.location.hash.slice(1).split('?')[0] || 'home';
+    const app = document.getElementById('app');
+    const dd = document.getElementById('userDD'); if (dd) dd.remove();
 
     const hasTenant = !!DB.getBarbeariaId();
-    if(!hasTenant && hash !== 'superadmin' && hash !== 'login' && hash !== 'register'){
-      if(Auth.isSuperAdmin()){ Nav.go('superadmin'); return; }
-      else if(Auth.isAdmin() && Auth.cur.barbeariaId){ window.location.href = `?b=${Auth.cur.barbeariaId}#admin`; return; }
+    if (!hasTenant && hash !== 'superadmin' && hash !== 'login' && hash !== 'register') {
+      if (Auth.isSuperAdmin()) { Nav.go('superadmin'); return; }
+      else if (Auth.isAdmin() && Auth.cur.barbeariaId) { window.location.href = `?b=${Auth.cur.barbeariaId}#admin`; return; }
       else { app.innerHTML = rNoTenant(); return; }
     }
 
-    if(!Auth.ok()&&!['login','register'].includes(hash)){window.location.hash='login';return;}
-    
-    if(Auth.ok()){
-      if(['login','register'].includes(hash)){window.location.hash=Auth.isAdmin()?'admin':'home';return;}
-      if(Auth.isAdmin() && hash === 'home') { window.location.hash='admin'; return; }
-      if(Auth.isSuperAdmin() && hash !== 'superadmin') { window.location.hash='superadmin'; return; }
+    if (!Auth.ok() && !['login', 'register'].includes(hash)) { window.location.hash = 'login'; return; }
+
+    if (Auth.ok()) {
+      if (['login', 'register'].includes(hash)) { window.location.hash = Auth.isAdmin() ? 'admin' : 'home'; return; }
+      if (Auth.isAdmin() && hash === 'home') { window.location.hash = 'admin'; return; }
+      if (Auth.isSuperAdmin() && hash !== 'superadmin') { window.location.hash = 'superadmin'; return; }
     }
 
     app.innerHTML = '<div style="padding:100px;text-align:center;color:var(--gold)">Carregando...</div>';
 
     let content = '';
-    if(hash==='login'){content=rLogin(); this._draw(app, content); this._bindAuth(); return;}
-    if(hash==='register'){content=rRegister(); this._draw(app, content); this._bindAuth(); return;}
-    if(hash==='superadmin'){ 
-      content=rSuperAdmin(); this._draw(app, rNavbar() + content); 
-      this._loadTenants(); return; 
+    if (hash === 'login') { content = rLogin(); this._draw(app, content); this._bindAuth(); return; }
+    if (hash === 'register') { content = rRegister(); this._draw(app, content); this._bindAuth(); return; }
+    if (hash === 'superadmin') {
+      content = rSuperAdmin(); this._draw(app, rNavbar() + content);
+      this._loadTenants(); return;
     }
 
-    if(hasTenant && Auth.ok()){
+    if (hasTenant && Auth.ok()) {
       await DB.loadServices();
       await DB.loadPros();
-      if(Auth.isAdmin()){ await DB.loadApts(); _tenantUsers = await DB.loadTenantUsers(); } 
+      if (Auth.isAdmin()) { await DB.loadApts(); _tenantUsers = await DB.loadTenantUsers(); }
       else { await DB.loadUserApts(Auth.cur.id); }
     }
 
-    if(hash==='home') content=rHome();
-    else if(hash==='booking') content=rBooking();
-    else if(hash==='appointments') content=rAppointments();
-    else if(hash==='admin') content=rAdmDash();
-    else if(hash==='admin-services') content=rAdmServices();
-    else if(hash==='admin-barbers') content=rAdmBarbers();
-    else if(hash==='admin-appointments') content=rAdmApts();
+    if (hash === 'home') content = rHome();
+    else if (hash === 'booking') content = rBooking();
+    else if (hash === 'appointments') content = rAppointments();
+    else if (hash === 'admin') content = rAdmDash();
+    else if (hash === 'admin-services') content = rAdmServices();
+    else if (hash === 'admin-barbers') content = rAdmBarbers();
+    else if (hash === 'admin-appointments') content = rAdmApts();
     else content = rHome();
 
     this._draw(app, rNavbar() + `<div style="flex:1">${content}</div>`);
   },
 
-  _draw(app, html){ app.innerHTML = html; },
+  _draw(app, html) { app.innerHTML = html; },
 
-  _bindAuth(){
-    const lf=document.getElementById('loginF');
-    if(lf) lf.onsubmit=async e=>{
+  _bindAuth() {
+    const lf = document.getElementById('loginF');
+    if (lf) lf.onsubmit = async e => {
       e.preventDefault();
-      const b=document.getElementById('btnLogin'); b.disabled=true; b.textContent='Entrando...';
-      const fd=new FormData(e.target), err=document.getElementById('loginErr');
-      try{
+      const b = document.getElementById('btnLogin'); b.disabled = true; b.textContent = 'Entrando...';
+      const fd = new FormData(e.target), err = document.getElementById('loginErr');
+      try {
         const u = await Auth.login(fd.get('email'), fd.get('pw'));
-        if(u.role === 'customer' || u.role === 'admin') {
-           if(u.barbeariaId !== DB.getBarbeariaId() && DB.getBarbeariaId()) {
-             await Auth.logout(); throw new Error('Conta não pertence a esta clínica.');
-           }
+        if (u.role === 'customer' || u.role === 'admin') {
+          if (u.barbeariaId !== DB.getBarbeariaId() && DB.getBarbeariaId()) {
+            await Auth.logout(); throw new Error('Conta não pertence a esta clínica.');
+          }
         }
-        T.ok(`Bem-vindo!`); Nav.go(u.role==='admin'?'admin':u.role==='superadmin'?'superadmin':'home');
+        T.ok(`Bem-vindo!`); Nav.go(u.role === 'admin' ? 'admin' : u.role === 'superadmin' ? 'superadmin' : 'home');
       }
-      catch(ex){err.textContent=ex.message;err.style.display='block'; b.disabled=false; b.textContent='Entrar';}
+      catch (ex) { err.textContent = ex.message; err.style.display = 'block'; b.disabled = false; b.textContent = 'Entrar'; }
     };
-    
-    const rf=document.getElementById('regF');
-    if(rf) rf.onsubmit=async e=>{
+
+    const rf = document.getElementById('regF');
+    if (rf) rf.onsubmit = async e => {
       e.preventDefault();
-      const b=document.getElementById('btnReg'); b.disabled=true; b.textContent='Criando...';
-      const fd=new FormData(e.target), err=document.getElementById('regErr');
-      if(fd.get('pw')!==fd.get('pw2')){err.textContent='As senhas não conferem.';err.style.display='block';b.disabled=false;b.textContent='Criar minha conta';return;}
-      try{
-        await Auth.register({name:fd.get('name'),email:fd.get('email'),phone:fd.get('phone'),pw:fd.get('pw')});
+      const b = document.getElementById('btnReg'); b.disabled = true; b.textContent = 'Criando...';
+      const fd = new FormData(e.target), err = document.getElementById('regErr');
+      if (fd.get('pw') !== fd.get('pw2')) { err.textContent = 'As senhas não conferem.'; err.style.display = 'block'; b.disabled = false; b.textContent = 'Criar minha conta'; return; }
+      try {
+        await Auth.register({ name: fd.get('name'), email: fd.get('email'), phone: fd.get('phone'), pw: fd.get('pw') });
         T.ok('Cadastro realizado com sucesso!'); Nav.go('home');
       }
-      catch(ex){err.textContent=ex.message;err.style.display='block'; b.disabled=false;b.textContent='Criar minha conta';}
+      catch (ex) { err.textContent = ex.message; err.style.display = 'block'; b.disabled = false; b.textContent = 'Criar minha conta'; }
     };
   },
 
@@ -762,22 +762,22 @@ export const App = {
     const err = document.getElementById('loginErr') || document.getElementById('regErr');
     try {
       const u = await Auth.loginWithGoogle(DB.getBarbeariaId());
-      if(u.role === 'customer' || u.role === 'admin') {
-         if(u.barbeariaId !== DB.getBarbeariaId() && DB.getBarbeariaId()) {
-           await Auth.logout(); throw new Error('Conta não pertence a esta clínica.');
-         }
+      if (u.role === 'customer' || u.role === 'admin') {
+        if (u.barbeariaId !== DB.getBarbeariaId() && DB.getBarbeariaId()) {
+          await Auth.logout(); throw new Error('Conta não pertence a esta clínica.');
+        }
       }
-      T.ok(`Bem-vindo, ${u.name}!`); Nav.go(u.role==='admin'?'admin':u.role==='superadmin'?'superadmin':'home');
-    } catch(ex) {
-      if (err) { err.textContent=ex.message; err.style.display='block'; }
+      T.ok(`Bem-vindo, ${u.name}!`); Nav.go(u.role === 'admin' ? 'admin' : u.role === 'superadmin' ? 'superadmin' : 'home');
+    } catch (ex) {
+      if (err) { err.textContent = ex.message; err.style.display = 'block'; }
       else { T.err(ex.message); }
     }
   },
 
-  async _loadTenants(){
+  async _loadTenants() {
     const tnts = await DB.getAllBarbearias();
     const tb = document.getElementById('tbTenants');
-    if(!tb) return;
+    if (!tb) return;
     tb.innerHTML = tnts.map(t => {
       const isAct = t.status === 'active';
       return `<tr>
@@ -789,10 +789,10 @@ export const App = {
               <input type="checkbox" onchange="App.toggleTenant('${t.id}', this.checked)" ${isAct ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
-            <span style="font-size:.75rem;font-weight:700;color:var(--${isAct?'success':'text3'})">${isAct ? 'ATIVO' : 'INATIVO'}</span>
+            <span style="font-size:.75rem;font-weight:700;color:var(--${isAct ? 'success' : 'text3'})">${isAct ? 'ATIVO' : 'INATIVO'}</span>
           </div>
         </td>
-        <td><a href="?b=${t.id}" target="_blank" style="${!isAct?'pointer-events:none;opacity:0.5':''}">Acessar 🔗</a></td>
+        <td><a href="?b=${t.id}" target="_blank" style="${!isAct ? 'pointer-events:none;opacity:0.5' : ''}">Acessar 🔗</a></td>
       </tr>`;
     }).join('');
   },
@@ -803,155 +803,155 @@ export const App = {
       await DB.updateBarbeariaStatus(id, newStatus);
       T.ok(`Tenant ${isActive ? 'ativado' : 'desativado'}.`);
       this._loadTenants();
-    } catch(e) {
+    } catch (e) {
       console.error(e);
       T.err('Erro ao atualizar status.');
       this._loadTenants();
     }
   },
 
-  async logout(){ await Auth.logout(); T.info('Você saiu.'); window.location.hash='login'; this.render(); },
+  async logout() { await Auth.logout(); T.info('Você saiu.'); window.location.hash = 'login'; this.render(); },
 
   // Booking Methods
-  bookWith(svcId){ BS.reset(); const s=DB.services().find(x=>x.id===svcId); if(s){BS.service=s;BS.step=2;} Nav.go('booking'); },
-  newBk(){BS.reset();Nav.go('booking');},
-  selSvc(id){BS.service=DB.services().find(x=>x.id===id)||null;this.render();},
-  selPro(id){BS.pro=DB.pros().find(x=>x.id===id)||null;this.render();},
-  selDate(d){BS.date=d;BS.time=null;this.render();},
-  selTime(t){BS.time=t;this.render();},
-  calP(){BS.calM--;if(BS.calM<0){BS.calM=11;BS.calY--;}this.render();},
-  calN(){BS.calM++;if(BS.calM>11){BS.calM=0;BS.calY++;}this.render();},
-  bkNext(){
-    const {step,service,pro,date,time}=BS;
-    if(step===1&&!service){T.warn('Selecione um serviço.');return;}
-    if(step===2&&!pro){T.warn('Selecione um especialista.');return;}
-    if(step===3&&(!date||!time)){T.warn('Selecione data e horário.');return;}
-    BS.step++;this.render();
+  bookWith(svcId) { BS.reset(); const s = DB.services().find(x => x.id === svcId); if (s) { BS.service = s; BS.step = 2; } Nav.go('booking'); },
+  newBk() { BS.reset(); Nav.go('booking'); },
+  selSvc(id) { BS.service = DB.services().find(x => x.id === id) || null; this.render(); },
+  selPro(id) { BS.pro = DB.pros().find(x => x.id === id) || null; this.render(); },
+  selDate(d) { BS.date = d; BS.time = null; this.render(); },
+  selTime(t) { BS.time = t; this.render(); },
+  calP() { BS.calM--; if (BS.calM < 0) { BS.calM = 11; BS.calY--; } this.render(); },
+  calN() { BS.calM++; if (BS.calM > 11) { BS.calM = 0; BS.calY++; } this.render(); },
+  bkNext() {
+    const { step, service, pro, date, time } = BS;
+    if (step === 1 && !service) { T.warn('Selecione um serviço.'); return; }
+    if (step === 2 && !pro) { T.warn('Selecione um especialista.'); return; }
+    if (step === 3 && (!date || !time)) { T.warn('Selecione data e horário.'); return; }
+    BS.step++; this.render();
   },
-  bkBack(){BS.step=Math.max(1,BS.step-1);this.render();},
-  
-  async confirmBk(){
-    const {service,pro,date,time}=BS; const u=Auth.cur;
-    if(!service||!pro||!date||!time){T.err('Dados incompletos.');return;}
+  bkBack() { BS.step = Math.max(1, BS.step - 1); this.render(); },
+
+  async confirmBk() {
+    const { service, pro, date, time } = BS; const u = Auth.cur;
+    if (!service || !pro || !date || !time) { T.err('Dados incompletos.'); return; }
     document.getElementById('btnConfirmBk').disabled = true;
     try {
-      if(!Avail.canBook(pro.id,date,time,service.duration)){
-        T.err('Horário indisponível.');BS.step=3;this.render();return;
+      if (!Avail.canBook(pro.id, date, time, service.duration)) {
+        T.err('Horário indisponível.'); BS.step = 3; this.render(); return;
       }
-      const apt={userId:u.id,serviceId:service.id,professionalId:pro.id,date,time,status:'confirmado',createdAt:new Date().toISOString(),price:service.price};
+      const apt = { userId: u.id, serviceId: service.id, professionalId: pro.id, date, time, status: 'confirmado', createdAt: new Date().toISOString(), price: service.price };
       await DB.addApt(apt);
-      await DB.updateUserPoints(u.id, (u.points||0) + Math.floor(service.price));
-      BS.step=5; T.ok('Agendamento confirmado!'); this.render();
-    } catch(e) {
+      await DB.updateUserPoints(u.id, (u.points || 0) + Math.floor(service.price));
+      BS.step = 5; T.ok('Agendamento confirmado!'); this.render();
+    } catch (e) {
       console.error(e); T.err('Erro ao agendar.'); document.getElementById('btnConfirmBk').disabled = false;
     }
   },
 
-  async cancelApt(id){
-    if(!confirm('Cancelar este agendamento?')) return;
+  async cancelApt(id) {
+    if (!confirm('Cancelar este agendamento?')) return;
     await DB.updateAptStatus(id, 'cancelado');
     T.ok('Agendamento cancelado.'); this.render();
   },
 
-  tabApt(tab){
-    const u=document.getElementById('tcU'), h=document.getElementById('tcH');
-    const tu=document.getElementById('tU'), th=document.getElementById('tH');
-    if(tab==='u'){u.style.display='flex';h.style.display='none';tu.classList.add('active');th.classList.remove('active');}
-    else{u.style.display='none';h.style.display='flex';tu.classList.remove('active');th.classList.add('active');}
+  tabApt(tab) {
+    const u = document.getElementById('tcU'), h = document.getElementById('tcH');
+    const tu = document.getElementById('tU'), th = document.getElementById('tH');
+    if (tab === 'u') { u.style.display = 'flex'; h.style.display = 'none'; tu.classList.add('active'); th.classList.remove('active'); }
+    else { u.style.display = 'none'; h.style.display = 'flex'; tu.classList.remove('active'); th.classList.add('active'); }
   },
 
   // Admin Methods
-  openSvcModal(id=null){
-    const s=id?DB.services().find(x=>x.id===id):null;
+  openSvcModal(id = null) {
+    const s = id ? DB.services().find(x => x.id === id) : null;
     document.getElementById('modalRoot').innerHTML = `
     <div class="modal-ov" onclick="if(event.target===this)App.closeModal()">
       <div class="modal">
-        <div class="modal-head"><h3 class="modal-title">${s?'Editar Serviço':'Novo Serviço'}</h3><button class="modal-close" onclick="App.closeModal()">✕</button></div>
+        <div class="modal-head"><h3 class="modal-title">${s ? 'Editar Serviço' : 'Novo Serviço'}</h3><button class="modal-close" onclick="App.closeModal()">✕</button></div>
         <form id="svcFrm">
-          <div class="fg"><label class="flabel">Nome *</label><input type="text" name="name" class="fc" value="${esc(s?.name||'')}" required></div>
-          <div class="fg"><label class="flabel">Duração (min) *</label><input type="number" name="dur" class="fc" value="${s?.duration||30}" min="15" step="15" required></div>
-          <div class="fg"><label class="flabel">Preço (R$) *</label><input type="number" name="price" class="fc" value="${s?.price||''}" min="0" step="0.01" required></div>
-          <button type="submit" class="btn btn-primary w-full">${s?'Salvar':'Criar'}</button>
+          <div class="fg"><label class="flabel">Nome *</label><input type="text" name="name" class="fc" value="${esc(s?.name || '')}" required></div>
+          <div class="fg"><label class="flabel">Duração (min) *</label><input type="number" name="dur" class="fc" value="${s?.duration || 30}" min="15" step="15" required></div>
+          <div class="fg"><label class="flabel">Preço (R$) *</label><input type="number" name="price" class="fc" value="${s?.price || ''}" min="0" step="0.01" required></div>
+          <button type="submit" class="btn btn-primary w-full">${s ? 'Salvar' : 'Criar'}</button>
         </form>
       </div>
     </div>`;
     document.getElementById('svcFrm').onsubmit = async e => {
-      e.preventDefault(); const fd=new FormData(e.target);
-      const data={name:fd.get('name'),duration:+fd.get('dur'),price:+fd.get('price')};
-      if(s) data.id = s.id;
-      await DB.saveService(data); App.closeModal(); T.ok(s?'Atualizado!':'Criado!'); this.render();
+      e.preventDefault(); const fd = new FormData(e.target);
+      const data = { name: fd.get('name'), duration: +fd.get('dur'), price: +fd.get('price') };
+      if (s) data.id = s.id;
+      await DB.saveService(data); App.closeModal(); T.ok(s ? 'Atualizado!' : 'Criado!'); this.render();
     };
   },
-  
-  openBrbModal(id=null){
-    const p=id?DB.pros().find(x=>x.id===id):null; const dn=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+  openBrbModal(id = null) {
+    const p = id ? DB.pros().find(x => x.id === id) : null; const dn = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     document.getElementById('modalRoot').innerHTML = `
     <div class="modal-ov" onclick="if(event.target===this)App.closeModal()">
       <div class="modal">
-        <div class="modal-head"><h3 class="modal-title">${p?'Editar Especialista':'Novo Especialista'}</h3><button class="modal-close" onclick="App.closeModal()">✕</button></div>
+        <div class="modal-head"><h3 class="modal-title">${p ? 'Editar Especialista' : 'Novo Especialista'}</h3><button class="modal-close" onclick="App.closeModal()">✕</button></div>
         <form id="brbFrm">
-          <div class="fg"><label class="flabel">Nome *</label><input type="text" name="name" class="fc" value="${esc(p?.name||'')}" required></div>
-          <div class="fg"><label class="flabel">Especialidades (separadas por vírgula)</label><input type="text" name="specs" class="fc" value="${esc((p?.specialties||[]).join(', '))}"></div>
+          <div class="fg"><label class="flabel">Nome *</label><input type="text" name="name" class="fc" value="${esc(p?.name || '')}" required></div>
+          <div class="fg"><label class="flabel">Especialidades (separadas por vírgula)</label><input type="text" name="specs" class="fc" value="${esc((p?.specialties || []).join(', '))}"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-            <div class="fg"><label class="flabel">Entrada</label><input type="time" name="start" class="fc" value="${p?.workingHours?.start||'09:00'}"></div>
-            <div class="fg"><label class="flabel">Saída</label><input type="time" name="end" class="fc" value="${p?.workingHours?.end||'18:00'}"></div>
+            <div class="fg"><label class="flabel">Entrada</label><input type="time" name="start" class="fc" value="${p?.workingHours?.start || '09:00'}"></div>
+            <div class="fg"><label class="flabel">Saída</label><input type="time" name="end" class="fc" value="${p?.workingHours?.end || '18:00'}"></div>
           </div>
           <div class="fg"><label class="flabel">Dias de trabalho</label>
             <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:5px">
-              ${dn.map((d,i)=>`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:5px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-size:.82rem"><input type="checkbox" name="wd" value="${i}" ${(p?.workingDays||[1,2,3,4,5]).includes(i)?'checked':''}>${d}</label>`).join('')}
+              ${dn.map((d, i) => `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:5px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-size:.82rem"><input type="checkbox" name="wd" value="${i}" ${(p?.workingDays || [1, 2, 3, 4, 5]).includes(i) ? 'checked' : ''}>${d}</label>`).join('')}
             </div>
           </div>
-          <button type="submit" class="btn btn-primary w-full">${p?'Salvar':'Cadastrar'}</button>
+          <button type="submit" class="btn btn-primary w-full">${p ? 'Salvar' : 'Cadastrar'}</button>
         </form>
       </div>
     </div>`;
     document.getElementById('brbFrm').onsubmit = async e => {
-      e.preventDefault(); const fd=new FormData(e.target);
-      const wds=Array.from(e.target.querySelectorAll('input[name="wd"]:checked')).map(el=>+el.value);
-      const data={name:fd.get('name'),specialties:fd.get('specs').split(',').map(s=>s.trim()).filter(Boolean),workingHours:{start:fd.get('start'),end:fd.get('end')},workingDays:wds};
-      if(p) data.id = p.id;
-      await DB.savePro(data); App.closeModal(); T.ok(p?'Atualizado!':'Cadastrado!'); this.render();
+      e.preventDefault(); const fd = new FormData(e.target);
+      const wds = Array.from(e.target.querySelectorAll('input[name="wd"]:checked')).map(el => +el.value);
+      const data = { name: fd.get('name'), specialties: fd.get('specs').split(',').map(s => s.trim()).filter(Boolean), workingHours: { start: fd.get('start'), end: fd.get('end') }, workingDays: wds };
+      if (p) data.id = p.id;
+      await DB.savePro(data); App.closeModal(); T.ok(p ? 'Atualizado!' : 'Cadastrado!'); this.render();
     };
   },
 
-  async delSvc(id){ if(confirm('Excluir este serviço?')){ await DB.deleteService(id); T.ok('Serviço excluído.'); this.render(); } },
-  async delBrb(id){ if(confirm('Excluir este especialista?')){ await DB.deletePro(id); T.ok('Especialista excluído.'); this.render(); } },
-  async admCancel(id){ if(confirm('Cancelar agendamento?')){ await DB.updateAptStatus(id, 'cancelado'); T.ok('Cancelado.'); this.render(); } },
-  async admComplete(id){ await DB.updateAptStatus(id, 'concluido'); T.ok('Concluído.'); this.render(); },
-  
-  toggleUserDD(){
-    const existing=document.getElementById('userDD'); if(existing){existing.remove();return;}
-    const u=Auth.cur; const ac=avColor(u.name); const tc=ac==='#C9A227'?'#000':'#fff';
-    document.body.insertAdjacentHTML('beforeend',`
+  async delSvc(id) { if (confirm('Excluir este serviço?')) { await DB.deleteService(id); T.ok('Serviço excluído.'); this.render(); } },
+  async delBrb(id) { if (confirm('Excluir este especialista?')) { await DB.deletePro(id); T.ok('Especialista excluído.'); this.render(); } },
+  async admCancel(id) { if (confirm('Cancelar agendamento?')) { await DB.updateAptStatus(id, 'cancelado'); T.ok('Cancelado.'); this.render(); } },
+  async admComplete(id) { await DB.updateAptStatus(id, 'concluido'); T.ok('Concluído.'); this.render(); },
+
+  toggleUserDD() {
+    const existing = document.getElementById('userDD'); if (existing) { existing.remove(); return; }
+    const u = Auth.cur; const ac = avColor(u.name); const tc = ac === '#C9A227' ? '#000' : '#fff';
+    document.body.insertAdjacentHTML('beforeend', `
     <div id="userDD" style="position:fixed;top:62px;right:18px;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:7px;min-width:195px;box-shadow:var(--sh);z-index:1100;animation:slideUp .15s ease">
       <div style="padding:9px 11px;border-bottom:1px solid var(--border);margin-bottom:4px"><div style="font-weight:700;font-size:.88rem">${esc(u.name)}</div><div style="font-size:.78rem;color:var(--text2)">${esc(u.email)}</div></div>
       <button class="btn btn-ghost w-full" style="justify-content:flex-start;gap:9px;padding:7px 11px;font-size:.85rem" onclick="App.logout()">⏻ Sair da conta</button>
     </div>`);
-    setTimeout(()=>{
-      document.addEventListener('click',function h(e){
-        if(!e.target.closest('#userDD')&&!e.target.closest('#uPill')){ const dd=document.getElementById('userDD');if(dd)dd.remove(); document.removeEventListener('click',h); }
+    setTimeout(() => {
+      document.addEventListener('click', function h(e) {
+        if (!e.target.closest('#userDD') && !e.target.closest('#uPill')) { const dd = document.getElementById('userDD'); if (dd) dd.remove(); document.removeEventListener('click', h); }
       });
-    },0);
+    }, 0);
   },
-  toggleMob(){const m=document.getElementById('mobMenu');if(m)m.classList.toggle('open');},
-  closeMob(){const m=document.getElementById('mobMenu');if(m)m.classList.remove('open');},
-  closeModal(){document.getElementById('modalRoot').innerHTML='';},
-  openTenantModal(){openTenantModal();},
+  toggleMob() { const m = document.getElementById('mobMenu'); if (m) m.classList.toggle('open'); },
+  closeMob() { const m = document.getElementById('mobMenu'); if (m) m.classList.remove('open'); },
+  closeModal() { document.getElementById('modalRoot').innerHTML = ''; },
+  openTenantModal() { openTenantModal(); },
 
   // Init
-  async init(){
-    window.App = this; 
+  async init() {
+    window.App = this;
     const params = new URLSearchParams(window.location.search);
     const tenantId = params.get('b');
-    
-    if(tenantId){
+
+    if (tenantId) {
       DB.setBarbeariaId(tenantId);
       _tenantInfo = await DB.getBarbeariaBySlug(tenantId);
-      if(!_tenantInfo || _tenantInfo.status !== 'active') { document.getElementById('app').innerHTML = rNoTenant(); return; }
+      if (!_tenantInfo || _tenantInfo.status !== 'active') { document.getElementById('app').innerHTML = rNoTenant(); return; }
     }
 
     Auth.init((user) => { this.render(); });
-    window.addEventListener('hashchange',()=>this.render());
+    window.addEventListener('hashchange', () => this.render());
   }
 };
 
